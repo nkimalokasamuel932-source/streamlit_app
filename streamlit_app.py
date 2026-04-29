@@ -7,7 +7,7 @@ st.set_page_config(page_title="IA EXPERT V2 - PRÉDICTIONS", layout="wide", page
 
 # Tirages réels pour les calculs de voisinage (Voisins du dernier tirage)
 DERNIERS_LOTO = [4, 12, 25, 33, 48]
-DERNIERS_EURO = [25, 26, 30, 40, 45]
+DERNIERS_EURO = [26, 29, 41, 46, 47]
 
 # --- FONCTION DE CALCUL AVANCÉ ---
 def calculer_scores_expert(df, derniers_numeros, limite):

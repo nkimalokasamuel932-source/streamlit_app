@@ -1,108 +1,70 @@
 import streamlit as st
 import pandas as pd
-import os
+import random
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="IA EXPERT V2 - PRÉDICTIONS", layout="wide", page_icon="🎯")
+# CONFIGURATION
+st.set_page_config(page_title="Loto-Euro Fusion V2.3", page_icon="🧬", layout="wide")
 
-# Tirages réels pour les calculs de voisinage (Voisins du dernier tirage)
-DERNIERS_LOTO = [4, 12, 25, 33, 48]
-DERNIERS_EURO = [26, 29, 41, 46, 47]
+st.title("🧬 Intelligence Croisée V2.3")
+st.subheader("Analyse Prédictive : Vendredi 1er Mai 2026")
 
-# --- FONCTION DE CALCUL AVANCÉ ---
-def calculer_scores_expert(df, derniers_numeros, limite):
-    df = df.copy()
+# --- 1. MISE À JOUR DES DONNÉES (POST-TIRAGE MARDI) ---
+stats_euro = {
+    34: {'reussite': 194, 'forme': 6, 'ecart_actuel': 16, 'ecart_max': 54}, # TENSION ++
+    42: {'reussite': 219, 'forme': 10, 'ecart_actuel': 17, 'ecart_max': 50}, # TENSION ++
+    13: {'reussite': 202, 'forme': 15, 'ecart_actuel': 2, 'ecart_max': 58}, # BASE FORME
+    23: {'reussite': 218, 'forme': 4, 'ecart_actuel': 3, 'ecart_max': 46},  # BASE MIROIR
+    11: {'reussite': 191, 'forme': 6, 'ecart_actuel': 6, 'ecart_max': 60},
+    10: {'reussite': 211, 'forme': 11, 'ecart_actuel': 5, 'ecart_max': 56},
+    7:  {'reussite': 198, 'forme': 6, 'ecart_actuel': 16, 'ecart_max': 51}, # NOUVELLE TENSION
+    2:  {'reussite': 179, 'forme': 4, 'ecart_actuel': 4, 'ecart_max': 48}
+}
+
+# --- 2. TA FONCTION DE SCORE EXPERT ---
+def calculer_score_expert(num):
+    data = stats_euro.get(num)
+    if not data: return 0
     
-    # 1. Calcul de la TENSION (Proximité de l'écart max)
-    # Plus le score approche 100, plus le numéro est statistiquement "dû"
-    df['tension'] = (df['ecart_actuel'] / df['ecart_max'] * 100).fillna(0)
+    # Tension (40%) : L'écart augmente, le score monte !
+    tension = (data['ecart_actuel'] / data['ecart_max'] * 100)
+    # Accélération (30%)
+    acceleration = (data['forme'] / 20 * 100) 
     
-    # 2. Calcul de l'ACCÉLÉRATION (Forme récente vs historique)
-    # Un score > 100 signifie que le numéro sort plus souvent que sa moyenne
-    moyenne_historique = df['reussite'].mean()
-    df['acceleration'] = (df['forme_generale'] / (moyenne_historique / 10) * 100).fillna(0)
+    # Bonus Correction (Si zone 40 sortie massivement mardi, bonus aux zones 10-30)
+    bonus_correction = 15 if num < 40 else 0
     
-    # 3. Bonus VOISINAGE
-    voisins = [n-1 for n in derniers_numeros] + [n+1 for n in derniers_numeros]
-    df['bonus_voisin'] = df['numero'].apply(lambda x: 20 if x in voisins else 0)
+    score = (tension * 0.4) + (acceleration * 0.3) + bonus_correction
+    return score
 
-    # 4. SCORE FINAL EXPERT (Pondération)
-    # 40% Tension + 30% Accélération + 20% Sniper (Ecart Fav) + 10% Voisins
-    df['score_expert'] = (df['tension'] * 0.4) + (df['acceleration'] * 0.3) + (df['ecart_fav'] * 2) + df['bonus_voisin']
+# --- 3. GÉNÉRATEUR ---
+def generer_grille_v23():
+    scores = {n: calculer_score_expert(n) for n in stats_euro.keys()}
+    tri = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     
-    return df.sort_values('score_expert', ascending=False)
+    # On force la sortie des 2 plus grosses tensions (34 et 42 ?)
+    bases = [tri[0][0], tri[1][0]]
+    reste = [x[0] for x in tri[2:]]
+    selection = bases + random.sample(reste, 3)
+    return sorted(selection)
 
-# --- CHARGEMENT DES DONNÉES ---
-@st.cache_data
-def load_data():
-    if os.path.exists('data_expert.csv'):
-        df = pd.read_csv('data_expert.csv')
-        df['jeu'] = df['jeu'].astype(str).str.upper().str.strip()
-        return df
-    return None
+# --- 4. INTERFACE ---
+tab1, tab2 = st.tabs(["🎯 PRONOSTIC VENDREDI", "📊 ANALYSE DES TENSIONS"])
 
-df_raw = load_data()
+with tab1:
+    if st.button("🚀 GÉNÉRER LE TICKET V2.3"):
+        grille = generer_grille_v23()
+        etoiles = sorted(random.sample([3, 5, 9, 11], 2)) # Étoiles basées sur le 26-29
+        
+        st.success(f"### NUMÉROS : {', '.join(map(str, grille))}")
+        st.warning(f"### ÉTOILES : {etoiles[0]} — {etoiles[1]}")
+        st.info("Stratégie : Correction des écarts sur les numéros 34 et 42.")
+        st.balloons()
 
-# --- INTERFACE ---
-st.title("🛰️ IA EXPERT V2 : Analyse Multi-Jeux")
-st.markdown("Système de détection de **Tension** et d'**Accélération** fréquentielle.")
+with tab2:
+    st.write("### Évolution des Scores après Mardi")
+    resultats = []
+    for n in stats_euro.keys():
+        resultats.append({"Numéro": n, "Nouveau Score": round(calculer_score_expert(n), 2)})
+    st.table(pd.DataFrame(resultats).sort_values("Nouveau Score", ascending=False))
 
-if df_raw is not None:
-    # Traitement des données
-    df_euro_final = calculer_scores_expert(df_raw[df_raw['jeu'] == 'EURO'], DERNIERS_EURO, 50)
-    df_loto_final = calculer_scores_expert(df_raw[df_raw['jeu'] == 'LOTO'], DERNIERS_LOTO, 49)
-
-    # --- BARRE DE RÉSUMÉ (METRICS) ---
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("🎯 Top Tension EURO", int(df_euro_final.iloc[0]['numero']), f"Score: {df_euro_final.iloc[0]['score_expert']:.1f}")
-    m2.metric("🎰 Top Tension LOTO", int(df_loto_final.iloc[0]['numero']), f"Score: {df_loto_final.iloc[0]['score_expert']:.1f}")
-    m3.metric("🔥 Accélération Max", int(df_euro_final.sort_values('acceleration', ascending=False).iloc[0]['numero']), "Signal Forme")
-    m4.metric("📊 Données", "Synchronisées", "GitHub OK")
-
-    st.divider()
-
-    # --- AFFICHAGE PAR ONGLETS ---
-    tab1, tab2, tab3 = st.tabs(["🇪🇺 EURO : Analyse Profonde", "🎰 LOTO : Analyse Profonde", "🧠 Comprendre les scores"])
-
-    with tab1:
-        st.subheader("Classement Expert Euromillions")
-        st.dataframe(
-            df_euro_final[['numero', 'score_expert', 'tension', 'acceleration', 'ecart_actuel', 'affinite']],
-            use_container_width=True,
-            column_config={
-                "score_expert": st.column_config.ProgressColumn("Score Global", min_value=0, max_value=150, format="%.1f"),
-                "tension": "Tension %",
-                "acceleration": "Vitesse"
-            }
-        )
-
-    with tab2:
-        st.subheader("Classement Expert Loto France")
-        st.dataframe(
-            df_loto_final[['numero', 'score_expert', 'tension', 'acceleration', 'ecart_actuel', 'affinite']],
-            use_container_width=True,
-            column_config={
-                "score_expert": st.column_config.ProgressColumn("Score Global", min_value=0, max_value=150, format="%.1f"),
-                "tension": "Tension %",
-                "acceleration": "Vitesse"
-            }
-        )
-
-    with tab3:
-        st.markdown("""
-        ### Comment utiliser cette V2 ?
-        * **La Tension % :** Si un numéro dépasse **80%**, il entre en zone critique de sortie (Ecart proche du record).
-        * **L'Accélération :** Si le score est haut, le numéro est dans une 'série'. Il faut souvent en inclure un ou deux.
-        * **Le Score Global :** C'est la synthèse. Un numéro avec un score élevé combine retard et probabilité de réveil.
-        """)
-
-    # --- SIDEBAR RECHERCHE ---
-    with st.sidebar:
-        st.header("🔍 Analyse par Numéro")
-        num = st.number_input("Choisir un numéro", 1, 50)
-        if num:
-            stats = df_raw[df_raw['numero'] == num]
-            st.write(stats)
-
-else:
-    st.error("Le fichier data_expert.csv est manquant sur votre GitHub.")
+st.caption("Version 2.3 - Mise à jour post-tirage du 28/04 - Prêt pour Vendredi !")

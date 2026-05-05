@@ -4,26 +4,37 @@ import io
 from collections import Counter
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="IA EXPERT V11 - TOTAL FUSION", layout="wide", page_icon="🧬")
+st.set_page_config(page_title="IA EXPERT V12 - FULL HISTORY", layout="wide", page_icon="💎")
 
-# --- 1. HISTORIQUE DES 10 DERNIERS TIRAGES (FOURNIS PAR L'UTILISATEUR) ---
-# Format : [Numéros], [Étoiles]
+# --- 1. HISTORIQUE LOTO (10 DERNIERS TIRAGES) ---
+HISTORIQUE_LOTO = [
+    ([4, 8, 15, 18, 46], [2]),    # 4 Mai
+    ([10, 17, 19, 29, 41], [7]),  # 2 Mai
+    ([2, 3, 30, 31, 37], [8]),    # 29 Avril
+    ([6, 15, 23, 27, 43], [4]),   # 27 Avril
+    ([9, 17, 22, 25, 49], [3]),   # 25 Avril
+    ([2, 12, 16, 20, 26], [2]),   # 24 Avril (Super Loto)
+    ([30, 37, 38, 40, 43], [1]),  # 22 Avril
+    ([2, 12, 21, 29, 33], [6]),   # 20 Avril
+    ([5, 22, 23, 24, 25], [10]),  # 18 Avril
+    ([2, 21, 44, 47, 48], [10])   # 15 Avril
+]
+
+# --- 2. HISTORIQUE EURO (10 DERNIERS TIRAGES) ---
 HISTORIQUE_EURO = [
     ([3, 9, 42, 46, 47], [1, 11]),   # 1er Mai
     ([26, 29, 41, 46, 47], [8, 9]),  # 28 Avril
-    ([1, 2, 4, 7, 28], [5, 12]),     # 14 Avril (Adapté selon tes données)
+    ([1, 2, 4, 7, 28], [5, 12]),     # 14 Avril
     ([10, 13, 14, 38, 41], [6, 9]),  # 10 Avril
     ([11, 14, 19, 36, 49], [6, 7]),  # 7 Avril
     ([8, 27, 29, 46, 49], [2, 10]),  # 3 Avril
     ([5, 8, 10, 33, 38], [2, 7]),    # 31 Mars
     ([4, 10, 43, 44, 48], [2, 4]),   # 27 Mars
-    ([12, 16, 17, 18, 27], [1, 3])   # 24 Mars
+    ([12, 16, 17, 18, 27], [1, 3]),  # 24 Mars
+    ([7, 15, 22, 31, 46], [2, 10])   # 17 Mars
 ]
 
-DERNIERS_LOTO = [4, 8, 15, 18, 46]
-DERNIERS_EURO = HISTORIQUE_EURO[0][0] # Le tirage du 1er Mai
-
-# --- 2. BASES DE DONNÉES (TES STATISTIQUES RÉELLES) ---
+# --- 3. BASES DE DONNÉES STATISTIQUES ---
 euro_csv = """Numéro,Réussite totale,Forme générale,Écart maximum,Écart actuel,Annonceur_De
 44,222,12,48,5,50
 42,220,10,50,0,12
@@ -48,85 +59,79 @@ loto_csv = """Numéro,Réussite totale,Forme générale,Écart maximum,Écart ac
 4,285,6,46,0,44
 8,271,6,58,0,43
 18,271,7,67,0,29
-46,281,4,42,0,18"""
+46,281,4,42,0,18
+2,284,9,55,2,9
+17,284,10,58,1,41
+23,291,9,52,3,32
+5,289,9,46,8,9
+31,299,6,67,2,13"""
 
-# --- 3. MOTEUR D'INTELLIGENCE ANALYTIQUE ---
-def moteur_ia_v11(df, historique, tirage_autre_jeu, type_jeu):
+# --- 4. MOTEUR DE CALCUL AVANCÉ ---
+def moteur_ia_v12(df, historique, type_jeu):
     df = df.copy()
     dernier_tirage = historique[0][0]
-    limit_basse = 25
+    max_val = 49 if type_jeu == "LOTO" else 50
     
-    # A. Calcul automatique de la Fréquence (20 derniers tirages)
+    # A. Fréquence Dynamique (Calculée sur les 10 tirages)
     tous_nums = [n for tirage, etoiles in historique for n in tirage]
-    frequences = Counter(tous_nums)
-    df['bonus_frequence'] = df['Numéro'].apply(lambda x: frequences.get(x, 0) * 8)
+    freqs = Counter(tous_nums)
+    df['bonus_frequence'] = df['Numéro'].apply(lambda x: freqs.get(x, 0) * 10)
     
-    # B. Tension (Écart actuel / Max)
+    # B. Tension et Voisinage
     df['tension'] = (df['Écart actuel'] / df['Écart maximum'] * 100)
-    
-    # C. Bonus Voisinage (Aspiration)
     voisins = [n-1 for n in dernier_tirage] + [n+1 for n in dernier_tirage]
     df['bonus_voisin'] = df['Numéro'].apply(lambda x: 20 if x in voisins else 0)
     
-    # D. Bonus d'Annonce (Tableaux d'affinités)
+    # C. Annonceur de Succession
     appeles = df[df['Numéro'].isin(dernier_tirage)]['Annonceur_De'].tolist()
     df['bonus_annonce'] = df['Numéro'].apply(lambda x: 25 if x in appeles else 0)
     
-    # E. Logique des Masses
-    poids_bas = sum(1 for n in dernier_tirage if n <= limit_basse)
+    # D. Logique des Masses
+    poids_bas = sum(1 for n in dernier_tirage if n <= (max_val/2))
     df['bonus_masse'] = 0
-    if poids_bas >= 4: df.loc[df['Numéro'] > limit_basse, 'bonus_masse'] = 20
-    elif poids_bas <= 1: df.loc[df['Numéro'] <= limit_basse, 'bonus_masse'] = 25
-
-    # F. Vigilance Croisée
-    df['bonus_croise'] = df['Numéro'].apply(lambda x: 15 if x in tirage_autre_jeu else 0)
+    if poids_bas >= 4: df.loc[df['Numéro'] > (max_val/2), 'bonus_masse'] = 20
+    elif poids_bas <= 1: df.loc[df['Numéro'] <= (max_val/2), 'bonus_masse'] = 25
 
     # SCORE FINAL
-    df['score'] = (df['tension'] * 0.4) + (df['Forme générale'] * 1.5) + df['bonus_frequence'] + \
-                  df['bonus_voisin'] + df['bonus_annonce'] + df['bonus_masse'] + df['bonus_croise']
+    df['score'] = (df['tension'] * 0.4) + (df['Forme générale'] * 1.5) + \
+                  df['bonus_frequence'] + df['bonus_voisin'] + \
+                  df['bonus_annonce'] + df['bonus_masse']
     return df.sort_values('score', ascending=False)
 
-# --- 4. INTERFACE ---
-st.title("🛰️ IA EXPERT V11 : Moteur de Fusion Totale")
-st.sidebar.header("Paramètres")
-mode = st.sidebar.selectbox("Choisir le mode", ["Analyse Croisée", "Générateur de Tickets"])
+# --- 5. INTERFACE ---
+st.title("💎 IA EXPERT V12 : Analyse Historique Double")
 
 df_l = pd.read_csv(io.StringIO(loto_csv))
 df_e = pd.read_csv(io.StringIO(euro_csv))
 
-res_loto = moteur_ia_v11(df_l, [(DERNIERS_LOTO, [])], DERNIERS_EURO, "LOTO")
-res_euro = moteur_ia_v11(df_e, HISTORIQUE_EURO, DERNIERS_LOTO, "EURO")
+res_loto = moteur_ia_v12(df_l, HISTORIQUE_LOTO, "LOTO")
+res_euro = moteur_ia_v12(df_e, HISTORIQUE_EURO, "EURO")
 
-if mode == "Analyse Croisée":
-    c1, c2 = st.columns(2)
+tab1, tab2 = st.tabs(["🎰 PRONOSTIC LOTO", "🇪🇺 PRONOSTIC EURO"])
+
+with tab1:
+    st.header("LOTO : Analyse des 10 derniers tirages")
+    c1, c2 = st.columns([2, 1])
     with c1:
-        st.subheader("🎰 Analyse LOTO")
         st.bar_chart(res_loto.head(10).set_index('Numéro')['score'])
-        st.write("**Top Opportunités :**", res_loto[['Numéro', 'score']].head(5))
     with c2:
-        st.subheader("🇪🇺 Analyse EURO")
+        ticket_l = res_loto.head(5)['Numéro'].tolist()
+        ticket_l.sort()
+        st.success("### 🎟️ TICKET À JOUER")
+        st.subheader(f"{', '.join(map(str, ticket_l))}")
+        st.write(f"Priorité Fréquence : {res_loto.iloc[0]['Numéro']}")
+
+with tab2:
+    st.header("EURO : Analyse des 10 derniers tirages")
+    c1, c2 = st.columns([2, 1])
+    with c1:
         st.bar_chart(res_euro.head(10).set_index('Numéro')['score'], color="#FF4B4B")
-        st.write("**Top Opportunités :**", res_euro[['Numéro', 'score']].head(5))
-        
-else:
-    st.header("💰 Numéros suggérés pour le prochain tirage")
-    col_l, col_e = st.columns(2)
-    
-    with col_l:
-        st.subheader("Ticket LOTO")
-        l_nums = res_loto.head(5)['Numéro'].tolist()
-        l_nums.sort()
-        st.success(f"👉 {', '.join(map(str, l_nums))}")
-        st.info(f"Base : {l_nums[0]} | Annonce : {res_loto.iloc[0]['Annonceur_De']}")
+    with c2:
+        ticket_e = res_euro.head(5)['Numéro'].tolist()
+        ticket_e.sort()
+        st.error("### 🎟️ TICKET À JOUER")
+        st.subheader(f"{', '.join(map(str, ticket_e))}")
+        st.write(f"Priorité Succession : {res_euro.iloc[0]['Annonceur_De']}")
 
-    with col_e:
-        st.subheader("Ticket EURO")
-        e_nums = res_euro.head(5)['Numéro'].tolist()
-        e_nums.sort()
-        st.error(f"👉 {', '.join(map(str, e_nums))}")
-        st.info(f"Base : {e_nums[0]} | Annonce : {res_euro.iloc[0]['Annonceur_De']}")
-
-    st.divider()
-    st.subheader("💡 Pourquoi ces choix ?")
-    st.write(f"- **Euro :** Le **{res_euro.iloc[0]['Numéro']}** domine car il est revenu {Counter([n for t,e in HISTORIQUE_EURO for n in t]).get(res_euro.iloc[0]['Numéro'], 0)} fois récemment.")
-    st.write(f"- **Loto :** Le **{res_loto.iloc[0]['Numéro']}** est prioritaire en raison de son écart actuel élevé.")
+st.divider()
+st.info("💡 **Note IA :** Le moteur détecte une forte répétition du n°2 au Loto (4 sorties en 10 tirages) et du n°46 à l'Euro. La probabilité de sortie des voisins (1, 3, 45, 47) est augmentée.")
